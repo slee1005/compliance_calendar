@@ -1,0 +1,9 @@
+{
+  "editor.formatOnSave": true,
+  "dart.lineLength": 80,
+  "files.exclude": {
+    "**/.DS_Store": true,
+    "**/.dart_tool": true,
+    "build": true
+  }
+}

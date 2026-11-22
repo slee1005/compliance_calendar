@@ -1,0 +1,16 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - .tools/**
+    - build/**
+    - android/**
+    - ios/**
+    - windows/**
+    - macos/**
+    - packages/flutter_secure_storage_windows/**
+
+linter:
+  rules:
+    avoid_print: true
+    public_member_api_docs: true

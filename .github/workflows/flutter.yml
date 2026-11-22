@@ -1,0 +1,113 @@
+name: Flutter quality and four-platform builds
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      upload_artifacts:
+        description: 'Retain build artifacts (uses repository artifact storage)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.50.1'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test integration_test test_driver packages/flutter_secure_storage_windows/lib
+      - run: flutter analyze --fatal-infos --fatal-warnings
+      - run: dart analyze --fatal-infos packages/flutter_secure_storage_windows/lib
+      - run: flutter test --coverage
+
+  native-build:
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: android
+            runner: ubuntu-latest
+            command: flutter build apk --debug
+            artifact: build/app/outputs/flutter-apk/app-debug.apk
+          - target: ios
+            runner: macos-latest
+            command: flutter build ios --simulator --debug --no-codesign
+            artifact: preview-ios.tar.gz
+            apple_app: build/ios/iphonesimulator/Runner.app
+          - target: macos
+            runner: macos-latest
+            command: flutter build macos --debug
+            artifact: preview-macos.tar.gz
+            apple_app: build/macos/Build/Products/Debug/Compliance Manager.app
+          - target: windows
+            runner: windows-latest
+            command: flutter build windows --debug
+            artifact: build/windows/x64/runner/Debug
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        if: matrix.target == 'android'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: ${{ matrix.command }}
+      - name: Verify native OS key storage on desktop
+        if: matrix.target == 'macos' || matrix.target == 'windows'
+        run: flutter test integration_test/crypto_smoke_test.dart -d ${{ matrix.target }}
+      - name: Verify native SQLCipher cache and performance on desktop
+        if: matrix.target == 'macos' || matrix.target == 'windows'
+        run: flutter drive --driver=test_driver/storage_driver.dart --target=integration_test/storage_smoke_test.dart -d ${{ matrix.target }} --profile --dart-define=ENFORCE_STORAGE_PERFORMANCE=true
+      - name: Verify macOS native preview
+        if: matrix.target == 'macos'
+        run: bash tool/capture_preview.sh macos
+      - name: Verify native app password and privacy cover on desktop
+        if: matrix.target == 'macos' || matrix.target == 'windows'
+        run: flutter drive --driver=test_driver/lock_driver.dart --target=integration_test/lock_smoke_test.dart -d ${{ matrix.target }}
+      - name: Verify input memory lifecycle on desktop
+        if: matrix.target == 'macos' || matrix.target == 'windows'
+        run: flutter drive --driver=test_driver/input_driver.dart --target=integration_test/input_smoke_test.dart -d ${{ matrix.target }}
+      - name: Verify Windows native preview
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: ./tool/capture_preview.ps1 -DeviceId windows
+      - name: Rebuild normal application entrypoint after integration tests
+        if: matrix.target == 'macos' || matrix.target == 'windows'
+        run: ${{ matrix.command }}
+      - name: Preserve Apple bundle executable permissions
+        if: matrix.target == 'ios' || matrix.target == 'macos'
+        env:
+          COMPLIANCE_APP_PATH: ${{ matrix.apple_app }}
+          COMPLIANCE_ARCHIVE_PATH: ${{ matrix.artifact }}
+        run: tar -czf "$COMPLIANCE_ARCHIVE_PATH" -C "$(dirname "$COMPLIANCE_APP_PATH")" "$(basename "$COMPLIANCE_APP_PATH")"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_artifacts
+        with:
+          name: preview-${{ matrix.target }}
+          path: |
+            ${{ matrix.artifact }}
+            artifacts/t1/${{ matrix.target }}/
+            artifacts/t4/${{ matrix.target }}/
+            artifacts/t5/${{ matrix.target }}/
+            artifacts/t6/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 7
