@@ -261,3 +261,7 @@ macOS 네이티브 검사에서 코덱의 불변 버퍼와 제로화할 소유 �
 2026-11-21 사용자 요청: `https://github.com/slee1005/compliance_calendar.git`를 이 작업공간의 `origin`으로 연결했다. 기존 브랜치가 없는 빈 공개 저장소와 사용자 push 권한을 확인했다. 기존 Git 작성자 설정을 사용한다.
 
 초기 소스는 SDK·빌드·캡처·로컬 설정·서명/키 파일을 제외한다. `pubspec.lock`과 원본 기획 Markdown/PDF는 포함한다. GitHub CI의 바이너리 artifact 업로드는 기본 비활성화하고 수동 실행에서만 선택할 수 있게 했다. 원격 연결만으로 Windows 검사 통과를 주장하지 않는다.
+
+첫 커밋 `da50d0f`(T1~T6 소스 236개 파일)를 `main`에 업로드하고 `origin/main` 추적을 설정했다. HTTPS OAuth 인증은 `workflow` scope가 없어 업로드가 거부됐으며 원격 변경은 없었다. 이미 인증된 사용자 SSH 연결을 확인한 뒤 push URL만 `git@github.com:slee1005/compliance_calendar.git`로 설정해 업로드했다. fetch URL은 요청한 HTTPS 주소를 유지한다. 토큰·키를 새로 발급하거나 저장하지 않았다.
+
+첫 push의 [GitHub Actions 실행](https://github.com/slee1005/compliance_calendar/actions/runs/44983744438)이 대기열에 등록됐다. 이 기록 시점에는 원격 품질·4플랫폼 빌드 결과를 확인하지 않았으며, Windows 보류 항목은 유지한다. 로컬에서는 234개 테스트와 macOS·iOS Simulator·Android 빌드가 통과했다.
